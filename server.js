@@ -1,10 +1,10 @@
-import http from "http";
+import express from "express";
 
-const server = http.createServer((req, res) => {
-  res.setHeader("Content-Type", "text/plain");
-  res.end("Hello, World!");
+const app = express();
+
+app.get("/", (req, res) => {
+  res.send("Hello World");
 });
-
-server.listen(3000, () => {
-  console.log("server is listening on port 3000");
+app.listen(3000, () => {
+  console.log("app is running on port 3000");
 });
