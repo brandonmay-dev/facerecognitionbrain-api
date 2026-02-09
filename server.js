@@ -29,7 +29,17 @@ app.get("/", (req, res) => {
 });
 
 app.post("/signin", (req, res) => {
-  res.json("signing in");
+  const { email, password } = req.body;
+
+  const user = database.users.find(
+    (u) => u.email === email && u.password === password,
+  );
+
+  if (user) {
+    res.json("success");
+  } else {
+    res.status(400).json("error logging in");
+  }
 });
 
 app.listen(3000, () => {
