@@ -2,6 +2,7 @@ import express from "express";
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+
 app.use(express.json());
 
 const database = {
@@ -43,6 +44,22 @@ app.post("/signin", (req, res) => {
   }
 });
 
+app.post("/register", (req, res) => {
+  const { email, name, password } = req.body;
+
+  const newUser = {
+    id: String(database.users.length + 1),
+    name,
+    email,
+    password,
+    entries: 0,
+    joined: new Date(),
+  };
+
+  database.users.push(newUser);
+  res.json(newUser);
+});
+
 app.listen(PORT, () => {
-  console.log("app is running on port 3000");
+  console.log(`app is running on port ${PORT}`);
 });
