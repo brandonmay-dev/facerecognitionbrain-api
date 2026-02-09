@@ -72,6 +72,19 @@ app.get("/profile/:id", (req, res) => {
   }
 });
 
+app.put("/image", (req, res) => {
+  const { id } = req.body;
+
+  const user = database.users.find((u) => u.id === id);
+
+  if (user) {
+    user.entries++;
+    res.json(user.entries);
+  } else {
+    res.status(400).json("user not found");
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`app is running on port ${PORT}`);
 });
