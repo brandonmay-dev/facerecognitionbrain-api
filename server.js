@@ -1,9 +1,11 @@
 import express from "express";
 import bcrypt from "bcryptjs";
+import cors from "cors";
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+app.use(cors());
 app.use(express.json());
 
 const database = {
@@ -33,6 +35,7 @@ const sanitizeUser = (user) => {
   return safeUser;
 };
 
+// Routes
 app.get("/", (req, res) => {
   res.json(database.users.map(sanitizeUser));
 });
@@ -40,19 +43,14 @@ app.get("/", (req, res) => {
 app.post("/signin", async (req, res) => {
   const { email, password } = req.body;
 
-  if (!email || !password) {
+  if (!email || !password)
     return res.status(400).json("missing email or password");
-  }
 
   const user = database.users.find((u) => u.email === email);
-  if (!user) {
-    return res.status(400).json("error logging in");
-  }
+  if (!user) return res.status(400).json("error logging in");
 
   const isValid = await bcrypt.compare(password, user.hash);
-  if (isValid) {
-    return res.json(sanitizeUser(user));
-  }
+  if (isValid) return res.json(sanitizeUser(user));
 
   return res.status(400).json("error logging in");
 });
@@ -65,9 +63,7 @@ app.post("/register", async (req, res) => {
   }
 
   const exists = database.users.some((u) => u.email === email);
-  if (exists) {
-    return res.status(400).json("email already registered");
-  }
+  if (exists) return res.status(400).json("email already registered");
 
   const hash = await bcrypt.hash(password, 10);
 
@@ -95,7 +91,6 @@ app.get("/profile/:id", (req, res) => {
 
 app.put("/image", (req, res) => {
   const { id } = req.body;
-
   if (!id) return res.status(400).json("missing id");
 
   const user = database.users.find((u) => u.id === id);
@@ -103,6 +98,40 @@ app.put("/image", (req, res) => {
 
   user.entries += 1;
   return res.json(user.entries);
+});
+
+app.post("/imageurl", async (req, res) => {
+  const { input } = req.body;
+
+  if (!input) return res.status(400).json("missing input");
+  if (!process.env.CLARIFAI_PAT)
+    return res.status(500).json("Missing CLARIFAI_PAT env var");
+
+  try {
+    const MODEL_ID = "face-detection";
+
+    const clarifaiRes = await fetch(
+      `https://api.clarifai.com/v2/models/${MODEL_ID}/outputs`,
+      {
+        method: "POST",
+        headers: {
+          Accept: "application/json",
+          Authorization: `Key ${process.env.CLARIFAI_PAT}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          user_app_id: { user_id: "clarifai", app_id: "main" },
+          inputs: [{ data: { image: { url: input } } }],
+        }),
+      },
+    );
+
+    const data = await clarifaiRes.json();
+    return res.json(data);
+  } catch (err) {
+    console.error("Clarifai proxy error:", err);
+    return res.status(500).json("unable to work with api");
+  }
 });
 
 app.listen(PORT, () => {
