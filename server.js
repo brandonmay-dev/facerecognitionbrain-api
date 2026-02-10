@@ -1,6 +1,5 @@
 import express from "express";
-import { log } from "node:console";
-import bcrypt from "bcrypt-nodejs";
+import bcrypt from "bcryptjs";
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -13,6 +12,7 @@ const database = {
       id: "123",
       name: "John",
       email: "john@example.com",
+      hash: bcrypt.hashSync("cookies", 10),
       entries: 0,
       joined: new Date(),
     },
@@ -20,90 +20,91 @@ const database = {
       id: "124",
       name: "Sally",
       email: "sally@example.com",
+      hash: bcrypt.hashSync("bananas", 10),
       entries: 0,
       joined: new Date(),
     },
   ],
-  login: [
-    {
-      id: "987",
-      hash: "",
-      email: "john@example.com",
-    },
-  ],
+};
+
+const sanitizeUser = (user) => {
+  if (!user) return null;
+  const { hash, ...safeUser } = user;
+  return safeUser;
 };
 
 app.get("/", (req, res) => {
-  res.send(database.users);
+  res.json(database.users.map(sanitizeUser));
 });
 
-app.post("/signin", (req, res) => {
+app.post("/signin", async (req, res) => {
   const { email, password } = req.body;
 
-  const user = database.users.find(
-    (u) => u.email === email && u.password === password,
-  );
-
-  if (user) {
-    res.json("success");
-  } else {
-    res.status(400).json("error logging in");
+  if (!email || !password) {
+    return res.status(400).json("missing email or password");
   }
+
+  const user = database.users.find((u) => u.email === email);
+  if (!user) {
+    return res.status(400).json("error logging in");
+  }
+
+  const isValid = await bcrypt.compare(password, user.hash);
+  if (isValid) {
+    return res.json(sanitizeUser(user));
+  }
+
+  return res.status(400).json("error logging in");
 });
 
-app.post("/register", (req, res) => {
+app.post("/register", async (req, res) => {
   const { email, name, password } = req.body;
+
+  if (!email || !name || !password) {
+    return res.status(400).json("missing name, email, or password");
+  }
+
+  const exists = database.users.some((u) => u.email === email);
+  if (exists) {
+    return res.status(400).json("email already registered");
+  }
+
+  const hash = await bcrypt.hash(password, 10);
 
   const newUser = {
     id: String(database.users.length + 1),
     name,
     email,
-    password,
+    hash,
     entries: 0,
     joined: new Date(),
   };
 
   database.users.push(newUser);
-  res.json(newUser);
+  return res.json(sanitizeUser(newUser));
 });
 
 app.get("/profile/:id", (req, res) => {
   const { id } = req.params;
 
   const user = database.users.find((u) => u.id === id);
+  if (user) return res.json(sanitizeUser(user));
 
-  if (user) {
-    res.json(user);
-  } else {
-    res.status(400).json("user not found");
-  }
+  return res.status(404).json("user not found");
 });
 
 app.put("/image", (req, res) => {
   const { id } = req.body;
 
-  const user = database.users.find((u) => u.id === id);
+  if (!id) return res.status(400).json("missing id");
 
-  if (user) {
-    user.entries++;
-    res.json(user.entries);
-  } else {
-    res.status(400).json("user not found");
-  }
+  const user = database.users.find((u) => u.id === id);
+  if (!user) return res.status(404).json("user not found");
+
+  user.entries += 1;
+  return res.json(user.entries);
 });
 
 app.listen(PORT, () => {
   console.log(`app is running on port ${PORT}`);
-});
-
-bcrypt.hash("bacon", null, null, function (err, hash) {
-  // Store hash in your password DB.
-});
-
-// Load hash from your password DB.
-bcrypt.compare("bacon", hash, function (err, res) {
-  // res == true
-});
-bcrypt.compare("veggies", hash, function (err, res) {
-  // res = false
 });
