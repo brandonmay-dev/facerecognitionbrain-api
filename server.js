@@ -1,5 +1,6 @@
 import express from "express";
 import { log } from "node:console";
+import bcrypt from "bcrypt-nodejs";
 
 const app = express();
 const PORT = process.env.PORT || 3001;
