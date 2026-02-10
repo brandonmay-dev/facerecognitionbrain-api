@@ -1,4 +1,5 @@
 import express from "express";
+import { log } from "node:console";
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -11,7 +12,6 @@ const database = {
       id: "123",
       name: "John",
       email: "john@example.com",
-      password: "cookies",
       entries: 0,
       joined: new Date(),
     },
@@ -19,9 +19,15 @@ const database = {
       id: "124",
       name: "Sally",
       email: "sally@example.com",
-      password: "bananas",
       entries: 0,
       joined: new Date(),
+    },
+  ],
+  login: [
+    {
+      id: "987",
+      hash: "",
+      email: "john@example.com",
     },
   ],
 };
@@ -87,4 +93,16 @@ app.put("/image", (req, res) => {
 
 app.listen(PORT, () => {
   console.log(`app is running on port ${PORT}`);
+});
+
+bcrypt.hash("bacon", null, null, function (err, hash) {
+  // Store hash in your password DB.
+});
+
+// Load hash from your password DB.
+bcrypt.compare("bacon", hash, function (err, res) {
+  // res == true
+});
+bcrypt.compare("veggies", hash, function (err, res) {
+  // res = false
 });
