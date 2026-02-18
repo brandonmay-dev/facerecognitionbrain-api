@@ -1,6 +1,9 @@
 import express from "express";
 import bcrypt from "bcryptjs";
 import cors from "cors";
+import dotenv from "dotenv";
+
+dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -8,6 +11,7 @@ const PORT = process.env.PORT || 3001;
 app.use(cors());
 app.use(express.json());
 
+/** In-memory database (for learning) */
 const database = {
   users: [
     {
@@ -35,25 +39,29 @@ const sanitizeUser = (user) => {
   return safeUser;
 };
 
+/** ✅ Root */
 app.get("/", (req, res) => {
   res.json(database.users.map(sanitizeUser));
 });
 
+/** ✅ Signin */
 app.post("/signin", async (req, res) => {
   const { email, password } = req.body;
 
-  if (!email || !password)
+  if (!email || !password) {
     return res.status(400).json("missing email or password");
+  }
 
   const user = database.users.find((u) => u.email === email);
   if (!user) return res.status(400).json("error logging in");
 
   const isValid = await bcrypt.compare(password, user.hash);
-  if (isValid) return res.json(sanitizeUser(user));
+  if (!isValid) return res.status(400).json("error logging in");
 
-  return res.status(400).json("error logging in");
+  return res.json(sanitizeUser(user));
 });
 
+/** ✅ Register */
 app.post("/register", async (req, res) => {
   const { email, name, password } = req.body;
 
@@ -79,17 +87,20 @@ app.post("/register", async (req, res) => {
   return res.json(sanitizeUser(newUser));
 });
 
+/** ✅ Profile */
 app.get("/profile/:id", (req, res) => {
   const { id } = req.params;
 
   const user = database.users.find((u) => u.id === id);
-  if (user) return res.json(sanitizeUser(user));
+  if (!user) return res.status(404).json("user not found");
 
-  return res.status(404).json("user not found");
+  return res.json(sanitizeUser(user));
 });
 
+/** ✅ Increment entries */
 app.put("/image", (req, res) => {
   const { id } = req.body;
+
   if (!id) return res.status(400).json("missing id");
 
   const user = database.users.find((u) => u.id === id);
@@ -99,12 +110,14 @@ app.put("/image", (req, res) => {
   return res.json(user.entries);
 });
 
+/** ✅ Clarifai proxy (fixes CORS + hides PAT) */
 app.post("/imageurl", async (req, res) => {
   const { input } = req.body;
 
   if (!input) return res.status(400).json("missing input");
-  if (!process.env.CLARIFAI_PAT)
+  if (!process.env.CLARIFAI_PAT) {
     return res.status(500).json("Missing CLARIFAI_PAT env var");
+  }
 
   try {
     const MODEL_ID = "face-detection";
@@ -126,6 +139,12 @@ app.post("/imageurl", async (req, res) => {
     );
 
     const data = await clarifaiRes.json();
+
+    if (!clarifaiRes.ok) {
+      // pass through Clarifai error details
+      return res.status(clarifaiRes.status).json(data);
+    }
+
     return res.json(data);
   } catch (err) {
     console.error("Clarifai proxy error:", err);
