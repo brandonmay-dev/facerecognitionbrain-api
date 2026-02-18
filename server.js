@@ -11,7 +11,6 @@ const PORT = process.env.PORT || 3001;
 app.use(cors());
 app.use(express.json());
 
-/** In-memory database (for learning) */
 const database = {
   users: [
     {
@@ -39,12 +38,10 @@ const sanitizeUser = (user) => {
   return safeUser;
 };
 
-/** ✅ Root */
 app.get("/", (req, res) => {
   res.json(database.users.map(sanitizeUser));
 });
 
-/** ✅ Signin */
 app.post("/signin", async (req, res) => {
   const { email, password } = req.body;
 
@@ -61,7 +58,6 @@ app.post("/signin", async (req, res) => {
   return res.json(sanitizeUser(user));
 });
 
-/** ✅ Register */
 app.post("/register", async (req, res) => {
   const { email, name, password } = req.body;
 
@@ -87,7 +83,6 @@ app.post("/register", async (req, res) => {
   return res.json(sanitizeUser(newUser));
 });
 
-/** ✅ Profile */
 app.get("/profile/:id", (req, res) => {
   const { id } = req.params;
 
@@ -97,7 +92,6 @@ app.get("/profile/:id", (req, res) => {
   return res.json(sanitizeUser(user));
 });
 
-/** ✅ Increment entries */
 app.put("/image", (req, res) => {
   const { id } = req.body;
 
@@ -110,7 +104,6 @@ app.put("/image", (req, res) => {
   return res.json(user.entries);
 });
 
-/** ✅ Clarifai proxy (fixes CORS + hides PAT) */
 app.post("/imageurl", async (req, res) => {
   const { input } = req.body;
 
@@ -141,7 +134,6 @@ app.post("/imageurl", async (req, res) => {
     const data = await clarifaiRes.json();
 
     if (!clarifaiRes.ok) {
-      // pass through Clarifai error details
       return res.status(clarifaiRes.status).json(data);
     }
 
