@@ -2,15 +2,31 @@ import express from "express";
 import bcrypt from "bcryptjs";
 import cors from "cors";
 import dotenv from "dotenv";
+import crypto from "crypto";
 
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-app.use(cors());
+const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN || "http://localhost:5173";
+
+// Middleware (order matters)
 app.use(express.json());
 
+// CORS (must be before routes)
+app.use(
+  cors({
+    origin: FRONTEND_ORIGIN,
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  }),
+);
+
+// Handle preflight for all routes
+app.options("*", cors({ origin: FRONTEND_ORIGIN }));
+
+// In-memory "database"
 const database = {
   users: [
     {
@@ -38,6 +54,7 @@ const sanitizeUser = (user) => {
   return safeUser;
 };
 
+// Routes
 app.get("/", (req, res) => {
   res.json(database.users.map(sanitizeUser));
 });
@@ -71,7 +88,7 @@ app.post("/register", async (req, res) => {
   const hash = await bcrypt.hash(password, 10);
 
   const newUser = {
-    id: String(database.users.length + 1),
+    id: crypto.randomUUID(),
     name,
     email,
     hash,
@@ -144,6 +161,8 @@ app.post("/imageurl", async (req, res) => {
   }
 });
 
+// Start server
 app.listen(PORT, () => {
   console.log(`app is running on port ${PORT}`);
+  console.log(`CORS allowed origin: ${FRONTEND_ORIGIN}`);
 });
