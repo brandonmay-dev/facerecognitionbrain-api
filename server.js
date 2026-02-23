@@ -115,7 +115,45 @@ app.post("/signin", async (req, res) => {
   }
 });
 
-app.post("/image", async (req, res) => {
+app.post("/imageurl", async (req, res) => {
+  try {
+    const { input } = req.body;
+    if (!input) return res.status(400).json("missing input");
+
+    const PAT = process.env.CLARIFAI_PAT;
+    if (!PAT)
+      return res.status(500).json("Missing CLARIFAI_PAT in backend .env");
+
+    const MODEL_ID = "face-detection";
+
+    const clarifaiRes = await fetch(
+      `https://api.clarifai.com/v2/models/${MODEL_ID}/outputs`,
+      {
+        method: "POST",
+        headers: {
+          Accept: "application/json",
+          Authorization: `Key ${PAT}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          user_app_id: { user_id: "clarifai", app_id: "main" },
+          inputs: [{ data: { image: { url: input } } }],
+        }),
+      },
+    );
+
+    const data = await clarifaiRes.json();
+
+    if (!clarifaiRes.ok) return res.status(clarifaiRes.status).json(data);
+
+    return res.json(data);
+  } catch (err) {
+    console.error("imageurl error:", err);
+    return res.status(500).json("unable to work with api");
+  }
+});
+
+app.put("/image", async (req, res) => {
   try {
     const { id } = req.body;
     if (!id) return res.status(400).json("missing user id");
@@ -123,13 +161,15 @@ app.post("/image", async (req, res) => {
     const updated = await db("users")
       .where({ id })
       .increment("entries", 1)
-      .returning("entries");
+      .returning(["entries"]);
 
-    if (updated.length === 0) return res.status(400).json("user not found");
+    if (!updated || updated.length === 0) {
+      return res.status(404).json("user not found");
+    }
 
-    return res.json(updated[0]);
+    return res.json(updated[0]); // { entries: <number> }
   } catch (err) {
-    console.error("image error:", err);
+    console.error("image PUT error:", err);
     return res.status(500).json("unable to update entries");
   }
 });
