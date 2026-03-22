@@ -9,25 +9,41 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// ✅ THIS must be the FRONTEND origin (Vite)
-const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN || "http://localhost:5173";
-
-console.log("✅ Running server.js");
-console.log("✅ FRONTEND_ORIGIN =", FRONTEND_ORIGIN);
-
 app.use(express.json());
 
-// ✅ CORS: allow ONLY your frontend
-app.use(
+const ALLOWED = new Set(["http://localhost:5173", "http://127.0.0.1:5173"]);
+
+const corsOptions = {
+  origin: (origin, cb) => {
+    // allow Postman/curl (no Origin header)
+    if (!origin) return cb(null, true);
+
+    if (ALLOWED.has(origin)) return cb(null, true);
+
+    // IMPORTANT: don't throw here; respond as "not allowed"
+    return cb(null, false);
+  },
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+  optionsSuccessStatus: 200,
+};
+
+app.use(cors(corsOptions));
+app.options("*", cors(corsOptions));
+app.options(
+  "*",
   cors({
-    origin: FRONTEND_ORIGIN,
+    origin: (origin, cb) => {
+      if (!origin) return cb(null, true);
+      return ALLOWED.has(origin)
+        ? cb(null, true)
+        : cb(new Error("Blocked by CORS"));
+    },
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
   }),
 );
-
-// ✅ Preflight
-app.options("*", cors({ origin: FRONTEND_ORIGIN }));
 
 // ✅ Knex / Postgres
 const db = knex({
@@ -70,16 +86,27 @@ app.post("/register", async (req, res) => {
 
     const hash = await bcrypt.hash(password, 10);
 
-    const inserted = await db("users")
-      .insert({
-        name,
+    const user = await db.transaction(async (trx) => {
+      // Insert into login table
+      await trx("login").insert({
         email,
         hash,
-        joined: new Date(),
-      })
-      .returning(["id", "name", "email", "entries", "joined"]);
+      });
 
-    return res.json(inserted[0]);
+      // Insert into users table
+      const [newUser] = await trx("users")
+        .insert({
+          name,
+          email,
+          hash,
+          joined: new Date(),
+        })
+        .returning(["id", "name", "email", "entries", "joined"]);
+
+      return newUser;
+    });
+
+    return res.json(user);
   } catch (err) {
     console.error("register error:", err);
     return res.status(500).json({
@@ -94,20 +121,28 @@ app.post("/register", async (req, res) => {
 app.post("/signin", async (req, res) => {
   try {
     const { email, password } = req.body;
-    if (!email || !password)
+
+    if (!email || !password) {
       return res.status(400).json("missing email or password");
+    }
 
     const user = await db("users")
       .select("id", "name", "email", "entries", "joined", "hash")
       .where({ email })
       .first();
 
-    if (!user) return res.status(400).json("error logging in");
+    if (!user) {
+      return res.status(400).json("error logging in");
+    }
 
     const valid = await bcrypt.compare(password, user.hash);
-    if (!valid) return res.status(400).json("error logging in");
+    if (!valid) {
+      return res.status(400).json("error logging in");
+    }
 
-    const { hash: _hash, ...safeUser } = user;
+    // don't send hash back to frontend
+    const { hash, ...safeUser } = user;
+
     return res.json(safeUser);
   } catch (err) {
     console.error("signin error:", err);
