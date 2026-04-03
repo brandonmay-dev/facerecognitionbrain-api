@@ -11,7 +11,11 @@ const PORT = process.env.PORT || 3001;
 
 app.use(express.json());
 
-const ALLOWED = new Set(["http://localhost:5173", "http://127.0.0.1:5173"]);
+const ALLOWED = new Set([
+  "http://localhost:5173",
+  "http://127.0.0.1:5173",
+  "https://safe-dawn-54877-2bdeb01ab080.herokuapp.com",
+]);
 
 const corsOptions = {
   origin: (origin, cb) => {
@@ -31,21 +35,7 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 app.options("*", cors(corsOptions));
-app.options(
-  "*",
-  cors({
-    origin: (origin, cb) => {
-      if (!origin) return cb(null, true);
-      return ALLOWED.has(origin)
-        ? cb(null, true)
-        : cb(new Error("Blocked by CORS"));
-    },
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
-  }),
-);
 
-// ✅ Knex / Postgres
 const db = knex({
   client: "pg",
   connection: process.env.DATABASE_URL
