@@ -15,6 +15,7 @@ const ALLOWED = new Set([
   "http://localhost:5173",
   "http://127.0.0.1:5173",
   "https://safe-dawn-54877-2bdeb01ab080.herokuapp.com",
+  "https://smart-brain-app-32fac457676f.herokuapp.com",
 ]);
 
 const corsOptions = {
